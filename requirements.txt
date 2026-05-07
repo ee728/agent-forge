@@ -1,0 +1,11 @@
+# 核心依赖（必装）
+pyyaml>=6.0          # YAML 配置文件解析
+requests>=2.31.0     # HTTP 请求（调用 LLM API）
+
+# 设备连接（按需安装）
+paramiko>=3.4        # SSH 客户端
+pyserial>=3.5        # 串口通信
+
+# 可选增强
+rich>=13.0           # 终端美化输出（语法高亮、表格等）
+prompt_toolkit>=3.0  # 增强的 CLI 交互（历史记录、自动补全等）
