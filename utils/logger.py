@@ -79,7 +79,7 @@ class Logger:
 		
 		return f"{s}{b}{c}"
 
-	def log(self, message, color=None, style=None, bg=None, prefix=None, end='\n'):
+	def log(self, message, color=None, style=None, bg=None, prefix=None, end='\n',to_shell=True)->str:
 		"""
 		核心打印方法
 		:param message: 消息内容
@@ -101,7 +101,9 @@ class Logger:
 		
 		# 组合输出
 		output = f"{timestamp}{code}{pf}{message}{reset}"
-		print(output, end=end)
+		if to_shell:
+			print(output, end=end)
+		return output
 
 	# --- 快捷方法 (语法糖) ---
 	def info(self, msg):

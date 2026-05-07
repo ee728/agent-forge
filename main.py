@@ -14,6 +14,7 @@ AI Agent 入口
 from agent import Agent, LLMFactory
 from tools import ToolRegistry
 from tools.shell import LocalShellTool
+from tools.ask_user import AskUserTool
 
 
 def main():
@@ -22,6 +23,7 @@ def main():
     llm = LLMFactory.create()
     registry = ToolRegistry()
     registry.register(LocalShellTool())
+    registry.register(AskUserTool())
 
     agent = Agent(llm, registry, system_prompt)
     agent.run()

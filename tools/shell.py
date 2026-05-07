@@ -57,7 +57,7 @@ class LocalShellTool(BaseTool):
 	}
 
 	def execute(self, arguments:dict) -> ToolExecutionResult:
-		self.exe_result = ToolExecutionResult()
+		self.exe_result = ToolExecutionResult(None,None,None,None,None)
 		self.exe_result.tool_name = self.name
 		self.exe_result.parameters = arguments
 		try:
