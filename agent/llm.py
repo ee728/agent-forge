@@ -82,26 +82,35 @@ class OpenAICompatibleLLM(BaseLLM):
 		)
 
 	def chat(self, messages: list, tools: Optional[list] = None) -> LLMResponse:
-		payload = {
-			"model": self.model,
-			"messages": messages,
-			"temperature": self.temperature,
-			"max_tokens": self.max_tokens,
-		}
-		if tools:
-			payload["tools"] = tools
+		try:
+			payload = {
+				"model": self.model,
+				"messages": messages,
+				"temperature": self.temperature,
+				"max_tokens": self.max_tokens,
+			}
+			if tools:
+				payload["tools"] = tools
 
-		resp = requests.post(
-			f"{self.base_url}/v1/chat/completions",
-			headers={
-				"Authorization": f"Bearer {self.api_key}",
-				"Content-Type": "application/json",
-			},
-			json=payload,
-			timeout=60,
-		)
-		resp.raise_for_status()
-		return self.resp_data_process(resp.json())
+			resp = requests.post(
+				f"{self.base_url}/v1/chat/completions",
+				headers={
+					"Authorization": f"Bearer {self.api_key}",
+					"Content-Type": "application/json",
+				},
+				json=payload,
+				timeout=60,
+			)
+			if resp.status_code != 200:
+				print(f"[LLM Error] {resp.status_code}: {resp.text}")
+			resp.raise_for_status()
+			return self.resp_data_process(resp.json())
+		except Exception as e:
+			print(f"[LLM API Error] {type(e).__name__}: {e}")
+			return LLMResponse(
+				content=f"[LLM API Error] {type(e).__name__}: {e}",
+				finish_reason="error",
+			)
 
 
 class LLMFactory:

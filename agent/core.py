@@ -1,4 +1,6 @@
 import json
+import os
+from datetime import datetime
 
 from agent import BaseLLM
 from agent.llm import LLMResponse, ToolCall
@@ -8,11 +10,16 @@ from utils import Logger
 import sys
 
 
+HISTORY_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "history")
+
+
 class Agent:
 	def __init__(self, llm_client: BaseLLM, tool_registry: ToolRegistry, system_prompt: str):
 		self.llm = llm_client
 		self.tools = tool_registry
+		self.system_prompt = system_prompt
 		self.messages = []
+		self._first_user_input = ""
 		self.system_prompt = system_prompt
 
 		# tokens统计信息
@@ -50,14 +57,16 @@ class Agent:
 			prefix="[模型响应]"
 		)
 
-		if resp.usage:
-			total = resp.usage.get('total_tokens', 0)
-			prompt = resp.usage.get('prompt_tokens', 0)
-			completion = resp.usage.get('completion_tokens', 0)
-			prompt_cache_hit_tokens = resp.usage.get('prompt_cache_hit_tokens', 0)
-			prompt_cache_miss_tokens = resp.usage.get('prompt_cache_miss_tokens', 0)
-			msg = f"Total: {total} (Prompt: {prompt}, Completion: {completion}, CacheHit: {prompt_cache_hit_tokens}, CacheMiss: {prompt_cache_miss_tokens})"
-			self.log_tokens.log(msg, prefix="[Tokens]", color='white') # 临时设为白色以便看清数字
+		if self.tokens_info["total_tokens"] > 0:
+			t = self.tokens_info
+			msg = (
+				f"Total: {t['total_tokens']} "
+				f"(Prompt: {t['prompt_tokens']}, "
+				f"Completion: {t['completion_tokens']}, "
+				f"CacheHit: {t['prompt_cache_hit_tokens']}, "
+				f"CacheMiss: {t['prompt_cache_miss_tokens']})"
+			)
+			self.log_tokens.log(msg, prefix="[Tokens]", color='white')
 
 		reasoning = resp.raw_message.get('reasoning_content')
 		if reasoning:
@@ -137,6 +146,39 @@ class Agent:
 				msg["content"] += f"\n\n[Loaded skill: {name}]\n" + content
 				break
 
+	def _save_session(self):
+		os.makedirs(HISTORY_DIR, exist_ok=True)
+		prefix = self._first_user_input[:5] if self._first_user_input else "empty"
+		ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+		name = f"{prefix}_{ts}.json"
+		path = os.path.join(HISTORY_DIR, name)
+		with open(path, "w", encoding="utf-8") as f:
+			json.dump(self.messages, f, ensure_ascii=False, indent=2)
+		self.log_input.log(f"Session saved: {name}", color="green")
+
+	def _load_session(self, name: str):
+		path = os.path.join(HISTORY_DIR, name)
+		if not os.path.isfile(path):
+			self.log_input.log(f"File not found: {name}", color="red")
+			return False
+		with open(path, "r", encoding="utf-8") as f:
+			self.messages = json.load(f)
+		self.log_input.log(f"Session loaded: {name}", color="green")
+		return True
+
+	def _load_prompt(self, path: str):
+		if not os.path.isfile(path):
+			self.log_input.log(f"Prompt file not found: {path}", color="red")
+			return
+		with open(path, "r", encoding="utf-8") as f:
+			self.system_prompt = f.read()
+		self.messages.insert(0, {"role": "system", "content": self.system_prompt})
+		self.log_input.log(f"Prompt loaded: {path}", color="green")
+
+	def _list_history(self) -> list[str]:
+		os.makedirs(HISTORY_DIR, exist_ok=True)
+		return sorted(os.listdir(HISTORY_DIR))
+
 	def _process(self, user_input: str):
 		self.messages.append({"role": "user", "content": user_input})
 		self._rounds_since_todo_update += 1
@@ -154,6 +196,9 @@ class Agent:
 					"content": "Your previous response was cut off. You can split the output into several conversations.",
 				})
 				continue
+
+			if resp.finish_reason == "error":
+				break
 
 			self.messages.append(resp.raw_message)
 
@@ -189,34 +234,66 @@ class Agent:
 			self.log_input.log("👋 再见！", color='yellow')
 			sys.exit(0)
 
-	def __history_save(self):
-		pass
-
 	def run(self):
-		# 初始化系统提示词（注意：通常 system prompt 只在会话开始时添加一次，或者作为上下文常量）
-		# 如果这是长对话 Agent，建议不要把 system prompt 每次都 append 到 messages 里，否则会重复计费
 		self.messages.append({"role": "system", "content": self.system_prompt})
-		
 
-		self.log_input.log("🚀 Agent 已就绪，请输入指令 (输入 /exit 退出)", color='green')
-        
+		self.log_input.log(" Agent ready. Commands: /exit /save /load /history /prompt /tools", color='green')
+
 		while True:
-			# --- 使用封装好的输入函数 ---
 			user_input = self._get_user_input()
-
-			# 空输入处理（用户只按了回车）
 			if not user_input:
 				continue
-                
-			# 指令处理
+
 			if user_input == "/exit":
-				self.log_input.log("👋 正在退出...", color='yellow')
+				self._save_session()
+				self.log_input.log(" Exiting...", color='yellow')
 				break
+
 			elif user_input == "/tools":
-				print("\n🛠️ \033[1;35m可用工具列表:\033[0m")
+				print("\n \033[1;35mTools:\033[0m")
 				print(self.tools.list_tools())
 				print("-" * 50)
 				continue
+
+			elif user_input == "/save":
+				self._save_session()
+				continue
+
+			elif user_input == "/history":
+				files = self._list_history()
+				if not files:
+					self.log_input.log("No saved sessions.", color='yellow')
+				else:
+					print("\n \033[1;35mSaved sessions:\033[0m")
+					for f in files:
+						print(f"  {f}")
+					print("-" * 50)
+				continue
+
+			elif user_input.startswith("/load"):
+				name = user_input[6:].strip() if len(user_input) > 6 else ""
+				if not name:
+					self.log_input.log("Usage: /load <filename>", color='yellow')
+					self.log_input.log("Use /history to list saved sessions.", color='yellow')
+					continue
+				if self._load_session(name):
+					self.log_input.log(f"Resumed session with {len(self.messages)} messages.", color='green')
+				continue
+
+			elif user_input.startswith("/prompt"):
+				path = user_input[8:].strip() if len(user_input) > 8 else ""
+				if not path:
+					self.log_input.log("Usage: /prompt <filepath>", color='yellow')
+					continue
+				self._load_prompt(path)
+				continue
+
+			elif user_input.startswith("/"):
+				self.log_input.log(f"Unknown command: {user_input}", color='red')
+				self.log_input.log("Available: /exit /save /load /history /prompt /tools", color='yellow')
+				continue
+
 			else:
-				# 正常业务逻辑
+				if not self._first_user_input:
+					self._first_user_input = user_input
 				self._process(user_input)
