@@ -89,7 +89,7 @@ class AgentTodoTool(BaseTool):
 			"result": "",
 		}
 		self.__class__._tasks.append(task)
-		return json.dumps({"status": "ok", "task_id": task["id"]}, ensure_ascii=False)
+		return self.__render(self._tasks)
 
 	def _list(self, filter_status: str = None) -> str:
 		tasks = self._tasks
@@ -103,22 +103,19 @@ class AgentTodoTool(BaseTool):
 				task["status"] = status
 				if result is not None:
 					task["result"] = result
-				return json.dumps({"status": "ok", "task_id": task_id}, ensure_ascii=False)
-		return json.dumps({"status": "error", "message": f"task {task_id} not found"}, ensure_ascii=False)
+				return self.__render(self._tasks)
+		return f"Error: task {task_id} not found.\n" + self.__render(self._tasks)
 
 	def _delete(self, task_id: str) -> str:
 		for i, task in enumerate(self._tasks):
 			if task["id"] == task_id:
 				self.__class__._tasks.pop(i)
-				return json.dumps({"status": "ok", "task_id": task_id}, ensure_ascii=False)
-		return json.dumps({"status": "error", "message": f"task {task_id} not found"}, ensure_ascii=False)
+				return self.__render(self._tasks)
+		return f"Error: task {task_id} not found.\n" + self.__render(self._tasks)
 
 	def _clear(self) -> str:
-		before = len(self._tasks)
 		self.__class__._tasks = [t for t in self._tasks if t["status"] == "pending"]
-		after = len(self._tasks)
-		cleared = before - after
-		return json.dumps({"status": "ok", "cleared": cleared, "remaining": after}, ensure_ascii=False)
+		return self.__render(self._tasks)
 
 	def execute(self, arguments: dict) -> ToolExecutionResult:
 		self.exe_result = ToolExecutionResult(None, None, None, None, None)

@@ -113,7 +113,7 @@ class Agent:
 			print(error_content)
 		print("-" * 50)
 
-	def __context_engineering(self):
+	def __context_engineering(self,resp=LLMResponse):
 		if self._has_todo is None:
 			self._has_todo = "todo" in self.tools.list_tools()
 		if not self._has_todo:
@@ -131,6 +131,12 @@ class Agent:
 			return False
 		return tool_call.arguments.get("action") == "update"
 
+	def _inject_skill(self, name: str, content: str):
+		for msg in self.messages:
+			if msg["role"] == "system":
+				msg["content"] += f"\n\n[Loaded skill: {name}]\n" + content
+				break
+
 	def _process(self, user_input: str):
 		self.messages.append({"role": "user", "content": user_input})
 		self._rounds_since_todo_update += 1
@@ -139,21 +145,34 @@ class Agent:
 			self.__context_engineering()
 
 			resp = self.llm.chat(self.messages, tools=self.tools.get_schemas())
-			self.messages.append(resp.raw_message)
 			self.__token_info_update(resp.usage)
 			self.__resp_info_show(resp=resp)
+
+			if resp.finish_reason == "length":
+				self.messages.append({
+					"role": "user",
+					"content": "Your previous response was cut off. You can split the output into several conversations.",
+				})
+				continue
+
+			self.messages.append(resp.raw_message)
+
 			if resp.has_tool_calls:
 				for tool_call in resp.tool_calls:
 					if self._is_todo_update(tool_call):
 						self._rounds_since_todo_update = 0
+
 					tool_result = self.tools.execute(tool_call.name, tool_call.arguments)
 					self.__exe_result_info_show(tool_result)
+
 					self.messages.append({
 						"role": "tool",
 						"tool_call_id": tool_call.id,
-						#content后必须跟str而不是json或者其他格式
 						"content": tool_result.result_to_str,
 					})
+
+					if tool_call.name == "load_skill" and tool_call.arguments.get("action") == "load" and tool_result.status == "success":
+						self._inject_skill(tool_call.arguments.get("name"), tool_result.result)
 
 			elif resp.finish_reason == "stop":
 				break

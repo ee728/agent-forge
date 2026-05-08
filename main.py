@@ -16,6 +16,8 @@ from tools import ToolRegistry
 from tools.shell import LocalShellTool
 from tools.ask_user import AskUserTool
 from tools.todo_task import AgentTodoTool
+from tools.skill_loader import LoadSkillTool
+from tools.edit_file import EditFileTool
 
 
 def main():
@@ -26,6 +28,8 @@ def main():
     registry.register(LocalShellTool())
     registry.register(AskUserTool())
     registry.register( AgentTodoTool())
+    registry.register( LoadSkillTool())
+    registry.register( EditFileTool())
 
     agent = Agent(llm, registry, system_prompt)
     agent.run()
