@@ -15,6 +15,7 @@ from agent import Agent, LLMFactory
 from tools import ToolRegistry
 from tools.shell import LocalShellTool
 from tools.ask_user import AskUserTool
+from tools.todo_task import AgentTodoTool
 
 
 def main():
@@ -24,6 +25,7 @@ def main():
     registry = ToolRegistry()
     registry.register(LocalShellTool())
     registry.register(AskUserTool())
+    registry.register( AgentTodoTool())
 
     agent = Agent(llm, registry, system_prompt)
     agent.run()

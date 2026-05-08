@@ -1,9 +1,8 @@
 """
-询问用户 工具
-================
+Ask User Tool
+=============
 
-当agent遇到权限不足或者需要用户确认时，使用此工具与用户交互。
-
+Used when the agent needs user confirmation or additional input.
 """
 
 from .base import BaseTool
@@ -13,26 +12,22 @@ import json
 
 class AskUserTool(BaseTool):
 	"""
-	向用户发起询问，等待用户输入响应。
-
-	参数:
-		request: 对用户的请求
-
+	Pause execution and prompt the user for input.
 	"""
 
 	name = "ask_user"
-	description = "当需要用户确认或输入时调用此工具，会暂停执行等待用户响应"
+	description = "Pause and ask the user for confirmation or input, then wait for their response"
 	parameters = {
-        "type": "object",
-        "properties": {
-		"request": {
-			"type": "string", 
-			"description": "向用户展示的请求内容，应明确说明需要用户做什么（如确认/输入信息）"
+		"type": "object",
+		"properties": {
+			"request": {
+				"type": "string", 
+				"description": "Question or request to show the user — be explicit about what you need (confirmation / file path / value)"
 			},
-		"expected_response": {
-			"type": "string",
-			"description": "期望的用户响应类型（如'yes/no'、'file_path'等）",
-			"default": "any"
+			"expected_response": {
+				"type": "string",
+				"description": "Expected response type (e.g. 'yes/no', 'file_path', 'any')",
+				"default": "any"
 			}
 		},
 		"required": ["request"]
@@ -63,5 +58,3 @@ class AskUserTool(BaseTool):
 			self.exe_result.result = None
 			self.exe_result.error_message = output_str
 		return self.exe_result
-
-

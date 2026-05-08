@@ -1,7 +1,7 @@
 import json
 
 from agent import BaseLLM
-from agent.llm import LLMResponse
+from agent.llm import LLMResponse, ToolCall
 from tools import ToolRegistry
 from tools import ToolExecutionResult
 from utils import Logger
@@ -15,7 +15,7 @@ class Agent:
 		self.messages = []
 		self.system_prompt = system_prompt
 
-		#tokens统计信息
+		# tokens统计信息
 		self.tokens_info = {
 			"prompt_tokens":0,
 			"completion_tokens":0,
@@ -24,17 +24,18 @@ class Agent:
 			"prompt_cache_miss_tokens":0
 		}
 
-		#输出信息配置
-		# --- 初始化 4 个不同风格的 Logger --- 
+		# 输出信息配置
 		self.log_model = Logger(default_color='cyan', default_style='bold', show_time=False) 
 		self.log_tokens = Logger(default_color='black', default_style='dim', show_time=False)
 		self.log_reasoning = Logger(default_color='yellow', default_style='normal', show_time=False)  
 		self.log_content = Logger(default_color='green', default_style='bold', show_time=False)
 		self.log_tool = Logger(default_color='magenta', default_style='bold', show_time=False)
-
 		self.log_input = Logger(default_color='blue', default_style='bold', show_time=False)
-
 		self.log_executor = Logger(default_color='yellow', default_style='normal', show_time=False)
+
+		# 上下文工程状态
+		self._has_todo = None
+		self._rounds_since_todo_update = 0
 
 	def __token_info_update(self,usage:dict):
 		for info in usage.keys():
@@ -112,16 +113,39 @@ class Agent:
 			print(error_content)
 		print("-" * 50)
 
+	def __context_engineering(self):
+		if self._has_todo is None:
+			self._has_todo = "todo" in self.tools.list_tools()
+		if not self._has_todo:
+			return
+
+		if self._rounds_since_todo_update >= 3:
+			last = self.messages[-1]
+			reminder = "[Reminder] 你已有多轮对话没有更新 todo 任务进度了，请使用 todo 工具查看并更新状态。\n"
+			if isinstance(last.get("content"), str):
+				last["content"] = reminder + last["content"]
+			self._rounds_since_todo_update = 0
+
+	def _is_todo_update(self, tool_call:ToolCall) -> bool:
+		if tool_call.name != "todo":
+			return False
+		return tool_call.arguments.get("action") == "update"
+
 	def _process(self, user_input: str):
 		self.messages.append({"role": "user", "content": user_input})
+		self._rounds_since_todo_update += 1
 
 		while True:
+			self.__context_engineering()
+
 			resp = self.llm.chat(self.messages, tools=self.tools.get_schemas())
 			self.messages.append(resp.raw_message)
 			self.__token_info_update(resp.usage)
 			self.__resp_info_show(resp=resp)
 			if resp.has_tool_calls:
 				for tool_call in resp.tool_calls:
+					if self._is_todo_update(tool_call):
+						self._rounds_since_todo_update = 0
 					tool_result = self.tools.execute(tool_call.name, tool_call.arguments)
 					self.__exe_result_info_show(tool_result)
 					self.messages.append({
