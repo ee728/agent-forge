@@ -22,25 +22,25 @@ from tools.compress_context import CompressContextTool
 
 
 def main():
-    system_prompt = open("prompts/system.md").read()
+	system_prompt = open("prompts/system.md").read()
 
-    llm = LLMFactory.create()
-    registry = ToolRegistry()
-    registry.register(LocalShellTool())
-    registry.register(AskUserTool())
-    registry.register( AgentTodoTool())
-    registry.register( LoadSkillTool())
-    registry.register( EditFileTool())
-    registry.register( CompressContextTool())
+	llm = LLMFactory.create()
+	registry = ToolRegistry()
+	registry.register(LocalShellTool())
+	registry.register(AskUserTool())
+	registry.register( AgentTodoTool())
+	registry.register( LoadSkillTool())
+	registry.register( EditFileTool())
+	registry.register( CompressContextTool())
 
-    skill_tool = registry.get_tool("load_skill")
-    if skill_tool:
-        skill_list = skill_tool.list_skills()
-        system_prompt += "\n\n# Available Skills\nYou can load any of these with load_skill:\n" + skill_list
+	skill_tool = registry.get_tool("load_skill")
+	if skill_tool:
+		skill_list = skill_tool.list_skills()
+		system_prompt += "\n\n# Available Skills\nYou can load any of these with load_skill:\n" + skill_list
 
-    agent = Agent(llm, registry, system_prompt)
-    agent.run()
+	agent = Agent(llm, registry, system_prompt)
+	agent.run()
 
 
 if __name__ == "__main__":
-    main()
+	main()
