@@ -4,6 +4,7 @@
 
 - **Indentation**: Tabs (1 tab per level, display width 8 spaces)
 - **Format before commit**: Run `python3 scripts/format_tabs.py`
+- **Tests**: Run `python3 tests/run.py` — discovers all `*_test.py` under `tests/`
 
 ## Architecture
 
