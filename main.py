@@ -19,6 +19,7 @@ from tools.todo_task import AgentTodoTool
 from tools.skill_loader import LoadSkillTool
 from tools.edit_file import EditFileTool
 from tools.compress_context import CompressContextTool
+from tools.sub_agent import SubAgentTool
 
 
 def main():
@@ -32,6 +33,7 @@ def main():
 	registry.register( LoadSkillTool())
 	registry.register( EditFileTool())
 	registry.register( CompressContextTool())
+	registry.register( SubAgentTool())
 
 	skill_tool = registry.get_tool("load_skill")
 	if skill_tool:
