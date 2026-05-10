@@ -7,7 +7,7 @@ Used when the agent needs user confirmation or additional input.
 
 from .base import BaseTool
 from .base import ToolExecutionResult
-from utils import Logger
+from utils import Logger, sanitize
 import json
 
 class AskUserTool(BaseTool):
@@ -36,7 +36,7 @@ class AskUserTool(BaseTool):
 	def _get_user_input(self) -> str:
 		try:
 			raw_input = input("\n👤 \033[1;34mUser\033[0m => ")
-			cleaned_input = raw_input.strip()
+			cleaned_input = sanitize(raw_input.strip())
 			if not cleaned_input:
 				return "" 
 			return cleaned_input

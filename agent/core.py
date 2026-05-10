@@ -7,7 +7,7 @@ from agent import BaseLLM
 from agent.llm import LLMResponse, ToolCall
 from tools import ToolRegistry
 from tools import ToolExecutionResult
-from utils import Logger
+from utils import Logger, sanitize
 import sys
 
 
@@ -253,7 +253,7 @@ class Agent:
 
 	def _process(self, user_input: str):
 		self.conversation = self._clean_surrogates(self.conversation)
-		self.conversation.append({"role": "user", "content": user_input})
+		self.conversation.append({"role": "user", "content": sanitize(user_input)})
 		self._rounds_since_todo_update += 1
 
 		while True:
@@ -302,7 +302,7 @@ class Agent:
 	def _get_user_input(self) -> str:
 		try:
 			raw_input = input("\n👤 \033[1;34mUser\033[0m => ")
-			cleaned_input = raw_input.strip()
+			cleaned_input = sanitize(raw_input.strip())
 			if not cleaned_input:
 				return ""
 			return cleaned_input
