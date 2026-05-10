@@ -44,7 +44,7 @@ class LoadSkillTool(BaseTool):
 				return parts[2].strip()
 		return content
 
-	def _list_skills(self) -> str:
+	def list_skills(self) -> str:
 		files = glob.glob(os.path.join(SKILLS_DIR, "*.md"))
 		if not files:
 			return "No skills available."
@@ -80,7 +80,7 @@ class LoadSkillTool(BaseTool):
 
 		try:
 			if action == "list":
-				output = self._list_skills()
+				output = self.list_skills()
 
 			elif action == "load":
 				name = arguments.get("name")

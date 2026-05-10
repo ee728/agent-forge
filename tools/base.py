@@ -80,3 +80,6 @@ class ToolRegistry:
 
 	def list_tools(self) -> list[str]:
 		return list(self._tools.keys())
+
+	def get_tool(self, name: str) -> Optional[BaseTool]:
+		return self._tools.get(name)

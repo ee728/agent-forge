@@ -18,6 +18,7 @@ from tools.ask_user import AskUserTool
 from tools.todo_task import AgentTodoTool
 from tools.skill_loader import LoadSkillTool
 from tools.edit_file import EditFileTool
+from tools.compress_context import CompressContextTool
 
 
 def main():
@@ -30,6 +31,12 @@ def main():
     registry.register( AgentTodoTool())
     registry.register( LoadSkillTool())
     registry.register( EditFileTool())
+    registry.register( CompressContextTool())
+
+    skill_tool = registry.get_tool("load_skill")
+    if skill_tool:
+        skill_list = skill_tool.list_skills()
+        system_prompt += "\n\n# Available Skills\nYou can load any of these with load_skill:\n" + skill_list
 
     agent = Agent(llm, registry, system_prompt)
     agent.run()
