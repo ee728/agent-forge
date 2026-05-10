@@ -1,77 +1,52 @@
 """
-SubAgent 工具
-==============
+SubAgent Tool
+=============
 
-让主 Agent（BOSS）创建指定角色的子 Agent 来分派任务。
+Delegates tasks to a child Agent that shares the same LLM and tools
+(except sub_agent itself, to prevent infinite recursion).
 
-设计原则：
-- 子 Agent 是独立的 LLM 调用，拥有自己的角色身份
-- 每个子 Agent 是无状态的，每次调用独立
-- 主 Agent 可以串行地分派任务给多个子 Agent
-- 子 Agent 没有工具访问权限，专注思考和内容生成
-
-用法（主 Agent 视角）：
-  1. 决定需要什么角色
-  2. 调用 sub_agent(role="...", task="...")
-  3. 获取返回结果，继续下一步
+The sub-agent runs a full ReAct loop: it can read files, run shell
+commands, and use any other registered tool. The main agent controls
+what task to assign and optionally provides a custom system prompt.
 """
 
-import json
-import os
-import requests
 from .base import BaseTool, ToolExecutionResult
+from tools import ToolRegistry
+from agent import Agent
 
-
-CONFIG_PATH = os.path.join(
-	os.path.dirname(os.path.dirname(__file__)),
-	"config", "llm_config.json"
-)
 
 class SubAgentTool(BaseTool):
 	name = "sub_agent"
 	description = (
-		"Create a sub-agent with a specific role to work on a task. "
-		"You are the boss agent \u2014 delegate work to specialized sub-agents "
-		"and get their results back."
+		"Create a sub-agent to work on a task. "
+		"The sub-agent has access to all tools except sub_agent itself. "
+		"You can optionally set a custom system prompt for it."
 	)
 	parameters = {
 		"type": "object",
 		"properties": {
 			"role": {
 				"type": "string",
-				"description": (
-					"The role/persona for the sub-agent. "
-					"Examples: 'Python code reviewer', 'test engineer', "
-					"'documentation writer', 'data analyst'"
-				),
+				"description": "The role/persona for the sub-agent. Examples: 'Python code reviewer', 'test engineer'",
 			},
 			"task": {
 				"type": "string",
-				"description": "The specific task description for the sub-agent to work on",
+				"description": "The specific task for the sub-agent to execute",
 			},
-			"context": {
+			"system_prompt": {
 				"type": "string",
-				"description": "Optional context or background information",
+				"description": "Optional custom system prompt. If omitted, a default prompt based on the role is used.",
 			},
 		},
 		"required": ["role", "task"],
 	}
 
+	def __init__(self, llm=None, main_registry=None):
+		self._llm = llm
+		self._main_registry = main_registry
 
 	@staticmethod
-	def _load_config() -> dict:
-		"""从配置文件读取 LLM 配置"""
-		if not os.path.isfile(CONFIG_PATH):
-			raise FileNotFoundError(
-				f"LLM config not found: {CONFIG_PATH}"
-			)
-		with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-			config = json.load(f)
-		return config["llm"]
-
-	@staticmethod
-	def _build_system_prompt(role: str) -> str:
-		"""根据角色构建子 Agent 的系统提示词"""
+	def _default_system_prompt(role: str) -> str:
 		return (
 			f"You are a specialized AI assistant acting as: {role}. "
 			f"Focus on your assigned role and complete the task. "
@@ -79,71 +54,45 @@ class SubAgentTool(BaseTool):
 			f"Use Chinese for your final responses."
 		)
 
-	def _call_llm(
-		self, role: str, task: str, context: str = ""
-	) -> str:
-		"""调用 LLM API 让子 Agent 执行任务"""
-		cfg = self._load_config()
-		messages = [
-			{"role": "system",
-			 "content": self._build_system_prompt(role)},
-		]
-		if context:
-			messages.append({
-				"role": "user",
-				"content": f"[Background Context]\n{context}"
-			})
-		messages.append({"role": "user", "content": task})
-
-		payload = {
-			"model": cfg["model"],
-			"messages": messages,
-			"temperature": cfg.get("temperature", 0.7),
-			"max_tokens": cfg.get("max_tokens", 4096),
-		}
-		resp = requests.post(
-			f"{cfg['base_url'].rstrip('/')}/v1/chat/completions",
-			headers={
-				"Authorization": f"Bearer {cfg['api_key']}",
-				"Content-Type": "application/json",
-			},
-			json=payload,
-			timeout=120,
-		)
-		resp.raise_for_status()
-		data = resp.json()
-		content = data["choices"][0]["message"].get("content", "")
-
-
 	def execute(self, arguments: dict) -> ToolExecutionResult:
-		"""执行子 Agent 任务"""
 		role = arguments.get("role")
 		task = arguments.get("task")
-		context = arguments.get("context", "")
+		system_prompt = arguments.get("system_prompt")
 
 		if not role:
 			return ToolExecutionResult(
 				tool_name=self.name, parameters=arguments,
 				status="error", result=None,
-				error_message="'role' is required"
+				error_message="'role' is required",
 			)
 		if not task:
 			return ToolExecutionResult(
 				tool_name=self.name, parameters=arguments,
 				status="error", result=None,
-				error_message="'task' is required"
+				error_message="'task' is required",
 			)
+
+		if not system_prompt:
+			system_prompt = self._default_system_prompt(role)
+
 		try:
-			content = self._call_llm(role, task, context)
+			# Build a filtered registry (no sub_agent to prevent recursion)
+			sub_registry = ToolRegistry()
+			for name, tool in self._main_registry._tools.items():
+				if name != "sub_agent":
+					sub_registry.register(tool)
+
+			sub = Agent(self._llm, sub_registry, system_prompt)
+			result = sub._process(task)
+
 			return ToolExecutionResult(
 				tool_name=self.name, parameters=arguments,
-				status="success", result=content,
-				error_message=None
+				status="success", result=result,
+				error_message=None,
 			)
 		except Exception as e:
 			return ToolExecutionResult(
 				tool_name=self.name, parameters=arguments,
 				status="error", result=None,
-				error_message=f"SubAgent error: "
-				             f"{type(e).__name__}: {e}"
+				error_message=f"SubAgent error: {type(e).__name__}: {e}",
 			)

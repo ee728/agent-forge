@@ -33,7 +33,7 @@ def main():
 	registry.register( LoadSkillTool())
 	registry.register( EditFileTool())
 	registry.register( CompressContextTool())
-	registry.register( SubAgentTool())
+	registry.register( SubAgentTool(llm=llm, main_registry=registry))
 
 	skill_tool = registry.get_tool("load_skill")
 	if skill_tool:

@@ -251,7 +251,7 @@ class Agent:
 
 	# ---- main processing ----
 
-	def _process(self, user_input: str):
+	def _process(self, user_input: str) -> str:
 		self.conversation = self._clean_surrogates(self.conversation)
 		self.conversation.append({"role": "user", "content": sanitize(user_input)})
 		self._rounds_since_todo_update += 1
@@ -271,7 +271,7 @@ class Agent:
 				continue
 
 			if resp.finish_reason == "error":
-				break
+				return ""
 
 			self.conversation.append(resp.raw_message)
 
@@ -298,6 +298,11 @@ class Agent:
 
 			elif resp.finish_reason == "stop":
 				break
+
+		for msg in reversed(self.conversation):
+			if msg.get("role") == "assistant":
+				return msg.get("content", "")
+		return ""
 
 	def _get_user_input(self) -> str:
 		try:
