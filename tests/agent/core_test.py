@@ -1,5 +1,5 @@
 from tests.check import TestResult
-from agent.llm import BaseLLM, LLMResponse
+from agent.llm import BaseLLM, LLMResponse, ToolCall
 from tools import ToolRegistry
 from tools.todo_task import AgentTodoTool
 
@@ -74,12 +74,22 @@ def suite():
 		"no reminder without todo tool")
 
 	# ---- is_todo_update ----
-	from agent.llm import ToolCall
 	t.check(agent._is_todo_update(ToolCall(id="1", name="todo", arguments={"action": "update"})),
 		"todo update detected")
 	t.check(not agent._is_todo_update(ToolCall(id="2", name="todo", arguments={"action": "list"})),
 		"todo list not treated as update")
 	t.check(not agent._is_todo_update(ToolCall(id="3", name="edit_file", arguments={})),
 		"non-todo tool not treated as update")
+
+	# ---- compress command generates correct instruction ----
+	compress_input = (
+		"(System instruction) Compress this conversation using the compress_context "
+		"tool. Write a concise English summary covering: what was accomplished, key "
+		"decisions, current state, and any pending issues. Then confirm completion "
+		"with a brief message."
+	)
+	t.check("compress_context" in compress_input, "compress instruction mentions tool")
+	t.check("English summary" in compress_input, "compress instruction demands English")
+	t.check("key decisions" in compress_input, "compress instruction covers key decisions")
 
 	return t.summary("agent.core")

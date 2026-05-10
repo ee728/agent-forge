@@ -4,13 +4,13 @@ from .base import ToolExecutionResult
 
 class CompressContextTool(BaseTool):
 	name = "compress_context"
-	description = "Summarize the conversation history to free up context. Call this when the conversation is getting long or before saving."
+	description = "Summarize the conversation history in English to free up context. Call this when the conversation is getting long or before saving."
 	parameters = {
 		"type": "object",
 		"properties": {
 			"summary": {
 				"type": "string",
-				"description": "Concise summary covering: what was accomplished, key decisions, current state, and any pending issues.",
+				"description": "Concise English summary covering: what was accomplished, key decisions, current state, and any pending issues. Write this summary in English only.",
 			},
 		},
 		"required": ["summary"],

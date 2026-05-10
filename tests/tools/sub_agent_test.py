@@ -1,16 +1,6 @@
-"""
-SubAgent 工具测试
-================
-
-测试策略：
-- 成功路径涉及真实的 LLM API 调用，不在单元测试中覆盖
-- 测试 schema 生成、参数校验、错误处理等无外部依赖的部分
-"""
-
 import os
 from tests.check import TestResult
 from tools.sub_agent import SubAgentTool, CONFIG_PATH
-
 
 def suite():
 	tool = SubAgentTool()

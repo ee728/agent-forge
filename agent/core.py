@@ -312,7 +312,7 @@ class Agent:
 			sys.exit(0)
 
 	def run(self):
-		self.log_input.log("Agent ready. Commands: /exit /save /load /history /prompt /tools", color='green')
+		self.log_input.log("Agent ready. Commands: /exit /save /load /history /prompt /compress /tools", color='green')
 
 		while True:
 			user_input = self._get_user_input()
@@ -362,9 +362,22 @@ class Agent:
 				self._load_prompt(path)
 				continue
 
+			elif user_input == "/compress":
+				if not self.conversation:
+					self.log_input.log("No conversation to compress.", color='yellow')
+					continue
+				self.log_input.log("Compressing conversation...", color='yellow')
+				self._process(
+					"(System instruction) Compress this conversation using the compress_context "
+					"tool. Write a concise English summary covering: what was accomplished, key "
+					"decisions, current state, and any pending issues. Then confirm completion "
+					"with a brief message."
+				)
+				continue
+
 			elif user_input.startswith("/"):
 				self.log_input.log(f"Unknown command: {user_input}", color='red')
-				self.log_input.log("Available: /exit /save /load /history /prompt /tools", color='yellow')
+				self.log_input.log("Available: /exit /save /load /history /prompt /compress /tools", color='yellow')
 				continue
 
 			else:
